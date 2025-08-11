@@ -5,14 +5,14 @@ metadata:
   name: cloudkit-operator-base
 
 resources:
-  - rbac.yaml
-  - manager.yaml
-  - crd.yaml
-  - clusterorder-crd.yaml
-  - manager-config.yaml
-  - feature-gates.yaml
-  - logging-config.yaml
-  - webhook-config.yaml
+- rbac.yaml
+- manager.yaml
+- crd.yaml
+- clusterorder-crd.yaml
+- manager-config.yaml
+- feature-gates.yaml
+- logging-config.yaml
+- webhook-config.yaml
 
 # Common annotations with naming metadata
 commonAnnotations:
@@ -20,12 +20,15 @@ commonAnnotations:
   cloudkit.io/project: operator
 
 # Common labels
-commonLabels:
-  app.kubernetes.io/name: cloudkit-operator
-  app.kubernetes.io/component: controller
-  app.kubernetes.io/part-of: cloudkit
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/name: cloudkit-operator
+    app.kubernetes.io/part-of: cloudkit
+
 
 images:
-  - name: quay.io/innabox/cloudkit-operator
-    newName: ghcr.io/innabox/cloudkit-operator
-    newTag: latest
+- name: quay.io/innabox/cloudkit-operator
+  newName: ghcr.io/innabox/cloudkit-operator
+  newTag: latest
