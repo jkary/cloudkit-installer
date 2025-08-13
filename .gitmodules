@@ -6,4 +6,4 @@
 	url = https://github.com/innabox/fulfillment-service.git
 [submodule "components/cloudkit-aap"]
 	path = components/cloudkit-aap
-	url = https://github.com/innabox/cloudkit-aap.git
+	url = git@github.com:innabox/cloudkit-aap
