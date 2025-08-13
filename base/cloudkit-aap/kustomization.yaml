@@ -5,10 +5,11 @@ metadata:
   name: cloudkit-aap-base
 
 resources:
-  - cloudkit_env.yaml
+  - aap.yaml
+  - cloudkit-sa.yaml
   - job.yaml
+  - template-publisher.yaml
 
-# Common annotations with naming metadata
-commonAnnotations:
-  cloudkit.io/organization: cloudkit
-  cloudkit.io/project: aap
+labels:
+- pairs:
+    cloudkit.openshift.io/project: cloudkit-aap
