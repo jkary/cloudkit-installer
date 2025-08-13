@@ -14,4 +14,16 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+<<<<<<<< HEAD:base/fulfillment-service/database/sa.yaml
   name: fulfillment-database
+========
+  name: fulfillment-api
+spec:
+  to:
+    kind: Service
+    name: fulfillment-api
+  port:
+    targetPort: api
+  tls:
+    termination: passthrough
+>>>>>>>> upstream/main:base/fulfillment-service/service/route.yaml

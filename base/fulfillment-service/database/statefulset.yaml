@@ -52,21 +52,18 @@ spec:
         image: postgres
         imagePullPolicy: IfNotPresent
         env:
-        - name: POSTGRES_USER
+        - name: POSTGRESQL_USER
           value: client
-        - name: POSTGRES_PASSWORD
+        - name: POSTGRESQL_PASSWORD
           valueFrom:
-              secretKeyRef:
-                name: fulfillment-database-password
-                key: POSTGRES_PASSWORD
-        - name: POSTGRES_DATABASE
+            secretKeyRef:
+              name: fulfillment-database-password
+              key: POSTGRES_PASSWORD
+        - name: POSTGRESQL_DATABASE
           value: service
-        - name: PGDATA
-          value: /var/lib/pgsql/data/pgdata
         volumeMounts:
         - name: data
-          mountPath: /var/lib/pgsql/data
-          subPath: pgdata
+          mountPath: /var/lib/postgresql
         - name: server-cert
           mountPath: /secrets/cert
         - name: server-config
