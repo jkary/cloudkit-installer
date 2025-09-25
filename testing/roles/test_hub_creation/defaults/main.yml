@@ -1,0 +1,24 @@
+---
+# Default variables for test_hub_creation role
+
+# Hub configuration
+hub_id: "{{ test_hub_id }}"
+hub_namespace: "{{ test_namespace }}"
+hub_service_account: "fulfillment-controller"
+hub_token_duration: "1h"
+hub_token_namespace: "cktest"
+
+# Token creation command
+hub_token_command: "oc create token {{ hub_service_account }} -n {{ hub_token_namespace }} --duration {{ hub_token_duration }} --as system:admin"
+
+# Test settings
+max_wait_time: "{{ test_settings.max_wait_time }}"
+check_interval: "{{ test_settings.check_interval }}"
+
+# Temporary files
+hub_kubeconfig_file: "{{ test_workspace }}/hub-kubeconfig-{{ hub_id }}.yaml"
+hub_token_file: "{{ test_workspace }}/hub-token-{{ hub_id }}.txt"
+
+# Cleanup settings
+cleanup_on_success: true
+cleanup_on_failure: "{{ enable_cleanup }}"

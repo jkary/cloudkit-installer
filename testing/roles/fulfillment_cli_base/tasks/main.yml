@@ -1,0 +1,109 @@
+---
+# Main tasks for fulfillment_cli_base role
+
+- name: Create test workspace directory
+  ansible.builtin.file:
+    path: "{{ test_workspace }}"
+    state: directory
+    mode: '0755'
+  tags:
+    - setup
+    - workspace
+
+- name: Verify fulfillment-cli binary exists
+  ansible.builtin.stat:
+    path: "{{ cli_binary }}"
+  register: cli_binary_stat
+  failed_when: not cli_binary_stat.stat.exists
+  tags:
+    - validation
+    - cli
+
+- name: Ensure CLI binary is executable
+  ansible.builtin.file:
+    path: "{{ cli_binary }}"
+    mode: '0755'
+  when: cli_binary_stat.stat.exists
+  tags:
+    - setup
+    - cli
+
+- name: Verify KUBECONFIG environment variable is set
+  ansible.builtin.fail:
+    msg: "KUBECONFIG environment variable is not set. Please set it before running tests."
+  when: ansible_env.KUBECONFIG is undefined or ansible_env.KUBECONFIG == ""
+  tags:
+    - validation
+    - kubeconfig
+
+- name: Verify KUBECONFIG file exists
+  ansible.builtin.stat:
+    path: "{{ ansible_env.KUBECONFIG }}"
+  register: kubeconfig_stat
+  failed_when: not kubeconfig_stat.stat.exists
+  tags:
+    - validation
+    - kubeconfig
+
+- name: Test oc CLI connectivity
+  ansible.builtin.command:
+    cmd: oc whoami
+  environment:
+    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
+  register: oc_whoami_result
+  changed_when: false
+  tags:
+    - validation
+    - connectivity
+
+- name: Display current OpenShift user
+  ansible.builtin.debug:
+    msg: "Connected to OpenShift as: {{ oc_whoami_result.stdout }}"
+  tags:
+    - info
+    - connectivity
+
+- name: Login to fulfillment-cli
+  ansible.builtin.expect:
+    command: "{{ cli_binary }} login"
+    responses:
+      'Address': "{{ fulfillment_address }}"
+      'Insecure': "y"
+      'Token script': "{{ fulfillment_token_script }}"
+  register: cli_login_result
+  tags:
+    - setup
+    - login
+
+- name: Test fulfillment-cli connectivity after login
+  ansible.builtin.command:
+    cmd: "{{ cli_binary }} get clustertemplates"
+  register: cli_connectivity_test
+  changed_when: false
+  failed_when: cli_connectivity_test.rc != 0
+  tags:
+    - validation
+    - connectivity
+
+- name: Display fulfillment-cli connectivity status
+  ansible.builtin.debug:
+    msg: "fulfillment-cli connectivity test successful"
+  when: cli_connectivity_test.rc == 0
+  tags:
+    - info
+    - connectivity
+
+- name: Initialize test execution log
+  ansible.builtin.copy:
+    content: |
+      # CloudKit E2E Test Execution Log
+      Started at: {{ ansible_date_time.iso8601 }}
+      Test Environment: {{ test_environment }}
+      KUBECONFIG: {{ ansible_env.KUBECONFIG }}
+      OpenShift User: {{ oc_whoami_result.stdout }}
+      
+    dest: "{{ logging.test_log_file }}"
+    mode: '0644'
+  tags:
+    - setup
+    - logging

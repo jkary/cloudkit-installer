@@ -1,0 +1,21 @@
+---
+# Inventory for CloudKit E2E Testing
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      
+  vars:
+    # Test execution settings
+    test_environment: development
+    test_timeout: 1800  # 30 minutes
+    test_cleanup: true
+    
+    # Paths and executables
+    fulfillment_cli_path: "{{ playbook_dir }}/../fulfillment-cli"
+    testing_workspace: "/tmp/cloudkit-e2e-testing"
+    
+    # Default test configuration
+    test_hub_id: "e2e-test-hub-{{ ansible_date_time.epoch }}"
+    test_namespace: "cktest"

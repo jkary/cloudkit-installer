@@ -1,0 +1,22 @@
+---
+# Default variables for fulfillment_cli_base role
+
+# CLI binary and configuration
+cli_binary: "{{ fulfillment_cli.binary_path }}"
+cli_config_dir: "{{ fulfillment_cli.config_dir }}"
+cli_config_file: "{{ fulfillment_cli.config_file }}"
+cli_timeout: "{{ fulfillment_cli.timeout }}"
+
+# Default CLI configuration for fulfillment-cli login
+fulfillment_address: "dev-fulfillment-api-{{ test_namespace }}.apps.acm.local.lab:443"
+fulfillment_insecure: true
+fulfillment_token_script: "KUBECONFIG={{ ansible_env.KUBECONFIG }} oc create token fulfillment-controller -n {{ test_namespace }} --duration 1h --as system:admin"
+
+# Test settings
+test_workspace: "/tmp/cloudkit-e2e-testing"
+log_level: "{{ test_settings.log_level | default('info') }}"
+enable_cleanup: "{{ test_settings.cleanup_on_failure | default(true) }}"
+
+# Retry settings
+max_retries: 3
+retry_delay: 10

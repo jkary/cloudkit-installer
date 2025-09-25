@@ -1,0 +1,24 @@
+---
+# Handlers for test_hub_creation role
+
+- name: cleanup_hub_files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hub_kubeconfig_file }}"
+    - "{{ hub_token_file }}"
+  listen: "cleanup hub files"
+  tags:
+    - cleanup
+    - files
+
+- name: log_cleanup_result
+  ansible.builtin.lineinfile:
+    path: "{{ logging.test_log_file }}"
+    line: |
+      [{{ ansible_date_time.iso8601 }}] CLEANUP: Hub test files cleaned up for {{ hub_id }}
+  listen: "log cleanup result"
+  tags:
+    - cleanup
+    - logging

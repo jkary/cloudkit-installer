@@ -1,0 +1,52 @@
+---
+# Global variables for CloudKit E2E Testing
+
+# Fulfillment CLI Configuration
+fulfillment_cli:
+  config_dir: "{{ ansible_env.HOME }}/.config/fulfillment-cli"
+  config_file: "{{ ansible_env.HOME }}/.config/fulfillment-cli/config.json"
+  binary_path: "{{ fulfillment_cli_path }}"
+  timeout: 300
+
+# Test Hub Configuration
+test_hub:
+  service_account_name: "hub-access"
+  token_duration: "24h"
+  kubeconfig_template: |
+    apiVersion: v1
+    clusters:
+    - cluster:
+        server: "{{ hub_cluster_api_url }}"
+        insecure-skip-tls-verify: true
+      name: test-hub-cluster
+    contexts:
+    - context:
+        cluster: test-hub-cluster
+        user: hub-access
+      name: default
+    current-context: default
+    kind: Config
+    preferences: {}
+    users:
+    - name: hub-access
+      user:
+        token: "{{ hub_access_token }}"
+
+# Test Configuration
+test_settings:
+  max_wait_time: 1800  # 30 minutes
+  check_interval: 30   # 30 seconds
+  log_level: debug
+  cleanup_on_failure: true
+  
+# OpenShift/Kubernetes settings
+k8s_settings:
+  verify_ssl: false
+  timeout: 300
+  retries: 3
+  
+# Logging and reporting
+logging:
+  test_log_file: "{{ testing_workspace }}/test-execution.log"
+  results_file: "{{ testing_workspace }}/test-results.json"
+  enable_debug: true

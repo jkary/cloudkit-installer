@@ -1,0 +1,143 @@
+---
+# Main tasks for test_hub_creation role
+
+- name: Create hub service account if it doesn't exist
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: "{{ hub_service_account }}"
+        namespace: "{{ hub_token_namespace }}"
+  environment:
+    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
+  tags:
+    - setup
+    - serviceaccount
+
+- name: Get cluster API server URL
+  ansible.builtin.command:
+    cmd: oc whoami --show-server
+  environment:
+    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
+  register: cluster_api_url_result
+  changed_when: false
+  tags:
+    - setup
+    - cluster_info
+
+- name: Generate hub access token
+  ansible.builtin.command:
+    cmd: "{{ hub_token_command }}"
+  environment:
+    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
+  register: hub_token_result
+  changed_when: false
+  no_log: true
+  tags:
+    - setup
+    - token
+
+- name: Save hub token to file
+  ansible.builtin.copy:
+    content: "{{ hub_token_result.stdout }}"
+    dest: "{{ hub_token_file }}"
+    mode: '0600'
+  no_log: true
+  tags:
+    - setup
+    - token
+
+- name: Create minimal hub kubeconfig
+  ansible.builtin.copy:
+    content: |
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: {{ cluster_api_url_result.stdout }}
+          insecure-skip-tls-verify: true
+        name: test-hub-cluster
+      contexts:
+      - context:
+          cluster: test-hub-cluster
+          user: {{ hub_service_account }}
+        name: default
+      current-context: default
+      kind: Config
+      preferences: {}
+      users:
+      - name: {{ hub_service_account }}
+        user:
+          token: {{ hub_token_result.stdout }}
+    dest: "{{ hub_kubeconfig_file }}"
+    mode: '0600'
+  no_log: true
+  tags:
+    - setup
+    - kubeconfig
+
+- name: Register hub with fulfillment service
+  ansible.builtin.command:
+    cmd: >
+      {{ cli_binary }} create hub
+      --id {{ hub_id }}
+      --kubeconfig {{ hub_kubeconfig_file }}
+      --namespace {{ hub_namespace }}
+  register: hub_creation_result
+  tags:
+    - test
+    - hub_creation
+
+- name: Display hub creation result
+  ansible.builtin.debug:
+    var: hub_creation_result.stdout
+  tags:
+    - info
+    - hub_creation
+
+- name: Verify hub registration
+  ansible.builtin.command:
+    cmd: "{{ cli_binary }} get hubs"
+  register: hub_list_result
+  changed_when: false
+  tags:
+    - validation
+    - hub_verification
+
+- name: Check if hub appears in hub list
+  ansible.builtin.assert:
+    that:
+      - hub_id in hub_list_result.stdout
+    fail_msg: "Hub {{ hub_id }} not found in hub list"
+    success_msg: "Hub {{ hub_id }} successfully registered"
+  tags:
+    - validation
+    - hub_verification
+
+- name: Get detailed hub information
+  ansible.builtin.command:
+    cmd: "{{ cli_binary }} describe hub {{ hub_id }}"
+  register: hub_describe_result
+  changed_when: false
+  tags:
+    - info
+    - hub_verification
+
+- name: Display detailed hub information
+  ansible.builtin.debug:
+    var: hub_describe_result.stdout
+  tags:
+    - info
+    - hub_verification
+
+- name: Log successful hub creation
+  ansible.builtin.lineinfile:
+    path: "{{ logging.test_log_file }}"
+    line: |
+      [{{ ansible_date_time.iso8601 }}] SUCCESS: Hub {{ hub_id }} created and verified
+      Hub Details:
+      {{ hub_describe_result.stdout | indent(2, true) }}
+  tags:
+    - logging
+    - success
