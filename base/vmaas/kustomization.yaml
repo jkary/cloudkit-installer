@@ -8,6 +8,7 @@ resources:
   - cloudkit.openshift.io_cloudkitvms.yaml
   - udn.yaml
   - nfs-subdir-provisioner.yaml
+  - nfs-rbac.yaml
 
 labels:
 - pairs:
