@@ -130,6 +130,54 @@
     - info
     - hub_listing
 
+- name: Find hubs with test prefix for cleanup
+  ansible.builtin.set_fact:
+    cleanup_hubs: "{{ hub_data | selectattr('id', 'match', '^e2e-test-hub-.*') | list }}"
+  tags:
+    - never
+    - mrclean
+
+- name: Display hubs to be cleaned up
+  ansible.builtin.debug:
+    msg: |
+      ==========================================
+      Cleaning up {{ cleanup_hubs | length }} test hubs with prefix 'e2e-test-hub-'
+      ==========================================
+      Hub IDs to delete:
+      {% for hub in cleanup_hubs %}
+      - {{ hub.id }}
+      {% endfor %}
+      ==========================================
+  when: cleanup_hubs | length > 0
+  tags:
+    - never
+    - mrclean
+
+- name: Delete test hubs via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ item.id }}"}'
+      {{ fulfillment_address }}
+      private.v1.Hubs/Delete
+  register: cleanup_delete_result
+  changed_when: cleanup_delete_result.rc == 0
+  failed_when: false
+  loop: "{{ cleanup_hubs }}"
+  when: cleanup_hubs | length > 0
+  tags:
+    - mrclean
+    - never
+
+- name: Log cleanup completion
+  ansible.builtin.debug:
+    msg: "Successfully cleaned up {{ cleanup_hubs | length }} test hubs with prefix 'e2e-test-hub-'"
+  when: cleanup_hubs | length > 0
+  tags:
+    - never
+    - mrclean
+
 - name: Verify hub registration via gRPC call
   ansible.builtin.command:
     cmd: >
