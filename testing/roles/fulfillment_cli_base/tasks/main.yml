@@ -19,26 +19,9 @@
     - validation
     - cli
 
-- name: Ensure CLI binary is executable
-  ansible.builtin.file:
-    path: "{{ cli_binary }}"
-    mode: '0755'
-  when: cli_binary_stat.stat.exists
-  tags:
-    - setup
-    - cli
-
-- name: Verify KUBECONFIG environment variable is set
-  ansible.builtin.fail:
-    msg: "KUBECONFIG environment variable is not set. Please set it before running tests."
-  when: ansible_env.KUBECONFIG is undefined or ansible_env.KUBECONFIG == ""
-  tags:
-    - validation
-    - kubeconfig
-
 - name: Verify KUBECONFIG file exists
   ansible.builtin.stat:
-    path: "{{ ansible_env.KUBECONFIG }}"
+     path: "{{ ansible_env.KUBECONFIG }}"
   register: kubeconfig_stat
   failed_when: not kubeconfig_stat.stat.exists
   tags:
@@ -54,13 +37,6 @@
   changed_when: false
   tags:
     - validation
-    - connectivity
-
-- name: Display current OpenShift user
-  ansible.builtin.debug:
-    msg: "Connected to OpenShift as: {{ oc_whoami_result.stdout }}"
-  tags:
-    - info
     - connectivity
 
 - name: Login to fulfillment-cli
@@ -92,6 +68,39 @@
   tags:
     - info
     - connectivity
+
+- name: Generate access token for gRPC calls
+  ansible.builtin.command:
+    cmd: "{{ fulfillment_token_script }}"
+  environment:
+    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
+  register: grpc_token_result
+  changed_when: false
+  no_log: false
+  when: not ansible_check_mode
+  tags:
+    - setup
+    - token
+
+- name: Set dummy token for check mode
+  ansible.builtin.set_fact:
+    grpc_token_result:
+      stdout: "dummy-token-for-check-mode"
+  when: ansible_check_mode
+  tags:
+    - setup
+    - token
+
+- name: Save access token to file
+  ansible.builtin.copy:
+    content: "{{ grpc_token_result.stdout }}"
+    dest: "{{ testing_workspace }}/grpc-token.txt"
+    mode: '0600'
+  no_log: true
+  when: not ansible_check_mode
+  tags:
+    - setup
+    - token
 
 - name: Initialize test execution log
   ansible.builtin.copy:

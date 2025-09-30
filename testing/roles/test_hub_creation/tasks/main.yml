@@ -13,27 +13,6 @@
     - setup
     - cluster_info
 
-- name: Generate hub access token
-  ansible.builtin.command:
-    cmd: "{{ hub_token_command }}"
-  environment:
-    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
-  register: hub_token_result
-  changed_when: false
-  no_log: false
-  tags:
-    - setup
-    - token
-
-- name: Save hub token to file
-  ansible.builtin.copy:
-    content: "{{ hub_token_result.stdout }}"
-    dest: "{{ hub_token_file }}"
-    mode: '0600'
-  no_log: true
-  tags:
-    - setup
-    - token
 
 - name: Create minimal hub kubeconfig
   ansible.builtin.copy:
@@ -55,7 +34,7 @@
       users:
       - name: {{ hub_service_account }}
         user:
-          token: {{ hub_token_result.stdout }}
+          token: {{ grpc_token_result.stdout }}
     dest: "{{ hub_kubeconfig_file }}"
     mode: '0600'
   no_log: true
@@ -81,16 +60,6 @@
   tags:
     - info
     - hub_creation
-
-- name: Get authentication token for gRPC call
-  ansible.builtin.command:
-    cmd: "{{ hub_token_command }}"
-  register: grpc_token_result
-  changed_when: false
-  no_log: false
-  tags:
-    - validation
-    - hub_verification
 
 - name: List all existing hubs via gRPC call
   ansible.builtin.command:
@@ -264,7 +233,7 @@
     state: absent
   loop:
     - "{{ hub_kubeconfig_file }}"
-    - "{{ hub_token_file }}"
+    - "{{ testing_workspace }}/grpc-token.txt"
   tags:
     - cleanup
     - files
@@ -275,7 +244,7 @@
   register: cleanup_verification
   loop:
     - "{{ hub_kubeconfig_file }}"
-    - "{{ hub_token_file }}"
+    - "{{ testing_workspace }}/grpc-token.txt"
   failed_when: cleanup_verification.stat.exists
   tags:
     - cleanup

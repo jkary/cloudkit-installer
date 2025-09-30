@@ -7,7 +7,7 @@
     state: absent
   loop:
     - "{{ hub_kubeconfig_file }}"
-    - "{{ hub_token_file }}"
+    - "{{ testing_workspace }}/grpc-token.txt"
   listen: "cleanup hub files"
   tags:
     - cleanup

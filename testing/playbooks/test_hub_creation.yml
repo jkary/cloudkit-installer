@@ -38,15 +38,15 @@
             state: absent
           loop:
             - "{{ testing_workspace }}/hub-kubeconfig-{{ test_hub_id }}.yaml"
-            - "{{ testing_workspace }}/hub-token-{{ test_hub_id }}.txt"
+            - "{{ testing_workspace }}/grpc-token.txt"
           failed_when: false
-          
+
         - name: Log test failure
           ansible.builtin.lineinfile:
             path: "{{ testing_workspace }}/test-execution.log"
             line: "[{{ ansible_date_time.iso8601 }}] FAILED: Hub creation test failed"
             create: true
-          
+
         - name: Re-raise the error
           ansible.builtin.fail:
             msg: "Hub creation test failed"
@@ -67,4 +67,3 @@
           ==========================================
       tags:
         - summary
-
