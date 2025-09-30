@@ -3,7 +3,7 @@
 
 - name: Create test workspace directory
   ansible.builtin.file:
-    path: "{{ test_workspace }}"
+    path: "{{ testing_workspace }}"
     state: directory
     mode: '0755'
   tags:
@@ -64,12 +64,12 @@
     - connectivity
 
 - name: Login to fulfillment-cli
-  ansible.builtin.expect:
-    command: "{{ cli_binary }} login"
-    responses:
-      'Address': "{{ fulfillment_address }}"
-      'Insecure': "y"
-      'Token script': "{{ fulfillment_token_script }}"
+  ansible.builtin.command:
+    cmd: >
+      {{ cli_binary }} login
+      --address {{ fulfillment_address }}
+      --insecure
+      --token-script "{{ fulfillment_token_script }}"
   register: cli_login_result
   tags:
     - setup
@@ -102,7 +102,7 @@
       KUBECONFIG: {{ ansible_env.KUBECONFIG }}
       OpenShift User: {{ oc_whoami_result.stdout }}
       
-    dest: "{{ logging.test_log_file }}"
+    dest: "{{ testing_workspace }}/test-execution.log"
     mode: '0644'
   tags:
     - setup

@@ -10,10 +10,9 @@ cli_timeout: 300
 # Default CLI configuration for fulfillment-cli login
 fulfillment_address: "dev-fulfillment-api-{{ test_namespace }}.apps.acm.local.lab:443"
 fulfillment_insecure: true
-fulfillment_token_script: "KUBECONFIG={{ ansible_env.KUBECONFIG }} oc create token fulfillment-controller -n {{ test_namespace }} --duration 1h --as system:admin"
+fulfillment_token_script: "KUBECONFIG={{ ansible_env.KUBECONFIG }} oc create token fulfillment-admin -n {{ test_namespace }} --duration 1h --as system:admin"
 
 # Test settings
-test_workspace: "/tmp/cloudkit-e2e-testing"
 log_level: debug
 enable_cleanup: true
 

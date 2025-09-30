@@ -1,20 +1,6 @@
 ---
 # Main tasks for test_hub_creation role
 
-- name: Create hub service account if it doesn't exist
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ServiceAccount
-      metadata:
-        name: "{{ hub_service_account }}"
-        namespace: "{{ hub_token_namespace }}"
-  environment:
-    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
-  tags:
-    - setup
-    - serviceaccount
 
 - name: Get cluster API server URL
   ansible.builtin.command:
@@ -34,7 +20,7 @@
     KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
   register: hub_token_result
   changed_when: false
-  no_log: true
+  no_log: false
   tags:
     - setup
     - token
@@ -133,7 +119,7 @@
 
 - name: Log successful hub creation
   ansible.builtin.lineinfile:
-    path: "{{ logging.test_log_file }}"
+    path: "{{ testing_workspace }}/test-execution.log"
     line: |
       [{{ ansible_date_time.iso8601 }}] SUCCESS: Hub {{ hub_id }} created and verified
       Hub Details:
