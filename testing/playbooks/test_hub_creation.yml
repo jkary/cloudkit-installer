@@ -8,7 +8,7 @@
   vars:
     test_name: "Hub Creation Test"
     test_description: "Test creating and verifying a hub with fulfillment-cli"
-    
+
   tasks:
     - name: Display test information
       ansible.builtin.debug:
@@ -25,10 +25,31 @@
         - info
 
     - name: Execute hub creation test
-      ansible.builtin.include_role:
-        name: test_hub_creation
-      vars:
-        hub_id: "{{ test_hub_id }}"
+      block:
+        - name: Run hub creation test
+          ansible.builtin.include_role:
+            name: test_hub_creation
+          vars:
+            hub_id: "{{ test_hub_id }}"
+      rescue:
+        - name: Cleanup test files on failure
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ testing_workspace }}/hub-kubeconfig-{{ test_hub_id }}.yaml"
+            - "{{ testing_workspace }}/hub-token-{{ test_hub_id }}.txt"
+          failed_when: false
+          
+        - name: Log test failure
+          ansible.builtin.lineinfile:
+            path: "{{ testing_workspace }}/test-execution.log"
+            line: "[{{ ansible_date_time.iso8601 }}] FAILED: Hub creation test failed"
+            create: true
+          
+        - name: Re-raise the error
+          ansible.builtin.fail:
+            msg: "Hub creation test failed"
       tags:
         - test
         - hub_creation
@@ -41,18 +62,9 @@
           Test Summary: {{ test_name }}
           ==========================================
           Status: SUCCESS
-          Hub ID: {{ test_hub_id }} 
+          Hub ID: {{ test_hub_id }}
           Hub registered and verified successfully
           ==========================================
       tags:
         - summary
 
-  handlers:
-    - name: cleanup on failure
-      ansible.builtin.include_role:
-        name: test_hub_creation
-        tasks_from: handlers/main.yml
-      vars:
-        cleanup_action: "cleanup hub files"
-      when: cleanup_on_failure | default(true)
-      listen: "test failure cleanup"
