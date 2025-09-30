@@ -82,48 +82,125 @@
     - info
     - hub_creation
 
-- name: Verify hub registration
+- name: Get authentication token for gRPC call
   ansible.builtin.command:
-    cmd: "{{ cli_binary }} get hubs"
+    cmd: "{{ hub_token_command }}"
+  register: grpc_token_result
+  changed_when: false
+  no_log: false
+  tags:
+    - validation
+    - hub_verification
+
+- name: Verify hub registration via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      {{ fulfillment_address }}:{{ fulfillment_port }}
+      private.v1.Hubs/List
   register: hub_list_result
   changed_when: false
   tags:
     - validation
     - hub_verification
 
-- name: Check if hub appears in hub list
+- name: Check if hub appears in gRPC response
   ansible.builtin.assert:
     that:
       - hub_id in hub_list_result.stdout
-    fail_msg: "Hub {{ hub_id }} not found in hub list"
-    success_msg: "Hub {{ hub_id }} successfully registered"
+    fail_msg: "Hub {{ hub_id }} not found in gRPC hub list response"
+    success_msg: "Hub {{ hub_id }} successfully registered and verified via gRPC"
   tags:
     - validation
     - hub_verification
 
-- name: Get detailed hub information
+- name: Get detailed hub information via gRPC call
   ansible.builtin.command:
-    cmd: "{{ cli_binary }} describe hub {{ hub_id }}"
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ hub_id }}"}'
+      {{ fulfillment_address }}:{{ fulfillment_port }}
+      private.v1.Hubs/Get
   register: hub_describe_result
   changed_when: false
   tags:
     - info
     - hub_verification
 
-- name: Display detailed hub information
+- name: Display hub information summary
   ansible.builtin.debug:
-    var: hub_describe_result.stdout
+    msg: |
+      ==========================================
+      Hub Information: {{ hub_id }}
+      ==========================================
+      Hub ID: {{ (hub_describe_result.stdout | from_json).object.id | default(hub_id) }}
+      Capabilities: {{ (hub_describe_result.stdout | from_json).object.capabilities | default('N/A') }}
+      Creation Timestamp: {{ (hub_describe_result.stdout | from_json).object.metadata.creationTimestamp | default('N/A') }}
+      Namespace: {{ (hub_describe_result.stdout | from_json).object.namespace | default('N/A') }}
+      ==========================================
   tags:
     - info
     - hub_verification
 
-- name: Log successful hub creation
+- name: Delete hub via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ hub_id }}"}'
+      {{ fulfillment_address }}:{{ fulfillment_port }}
+      private.v1.Hubs/Delete
+  register: hub_delete_result
+  changed_when: hub_delete_result.rc == 0
+  tags:
+    - cleanup
+    - hub_deletion
+
+- name: Verify hub deletion via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ hub_id }}"}'
+      {{ fulfillment_address }}:{{ fulfillment_port }}
+      private.v1.Hubs/Get
+  register: hub_deletion_verification
+  failed_when: hub_deletion_verification.rc == 0
+  tags:
+    - cleanup
+    - verification
+
+- name: Clean up test files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hub_kubeconfig_file }}"
+    - "{{ hub_token_file }}"
+  tags:
+    - cleanup
+    - files
+
+- name: Verify test files are cleaned up
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: cleanup_verification
+  loop:
+    - "{{ hub_kubeconfig_file }}"
+    - "{{ hub_token_file }}"
+  failed_when: cleanup_verification.stat.exists
+  tags:
+    - cleanup
+    - verification
+
+- name: Log successful hub creation, verification, and cleanup
   ansible.builtin.lineinfile:
     path: "{{ testing_workspace }}/test-execution.log"
     line: |
-      [{{ ansible_date_time.iso8601 }}] SUCCESS: Hub {{ hub_id }} created and verified
-      Hub Details:
-      {{ hub_describe_result.stdout | indent(2, true) }}
+      [{{ ansible_date_time.iso8601 }}] SUCCESS: Hub {{ hub_id }} created, verified, deleted, and cleaned up
+      Hub was successfully removed from fulfillment service
   tags:
     - logging
     - success
