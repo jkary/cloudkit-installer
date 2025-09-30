@@ -92,12 +92,50 @@
     - validation
     - hub_verification
 
+- name: List all existing hubs via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      {{ fulfillment_address }}
+      private.v1.Hubs/List
+  register: all_hubs_list_result
+  changed_when: false
+  tags:
+    - info
+    - hub_listing
+
+- name: Set hub data for table display
+  ansible.builtin.set_fact:
+    hub_data: "{{ all_hubs_list_result.stdout | from_json | json_query('items[*].{id: id, capabilities: capabilities}') }}"
+  tags:
+    - info
+    - hub_listing
+
+- name: Display all existing hubs in table format
+  ansible.builtin.debug:
+    msg: |
+      ==========================================
+      All Registered Hubs ({{ (all_hubs_list_result.stdout | from_json).total }} total)
+      ==========================================
+      {% set id_width = ([hub_data | map(attribute='id') | map('length') | max, 10] | max) %}
+      {% set cap_width = ([hub_data | map(attribute='capabilities') | map('join', ', ') | map('length') | max, 12] | max) %}
+      {{ "%-*s | %s" | format(id_width, "Hub ID", "Capabilities") }}
+      {{ "-" * id_width }}-+-{{ "-" * cap_width }}
+      {% for hub in hub_data %}
+      {{ "%-*s | %s" | format(id_width, hub.id, hub.capabilities | join(', ')) }}
+      {% endfor %}
+      ==========================================
+  tags:
+    - info
+    - hub_listing
+
 - name: Verify hub registration via gRPC call
   ansible.builtin.command:
     cmd: >
       grpcurl -insecure
       -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
-      {{ fulfillment_address }}:{{ fulfillment_port }}
+      {{ fulfillment_address }}
       private.v1.Hubs/List
   register: hub_list_result
   changed_when: false
@@ -121,7 +159,7 @@
       grpcurl -insecure
       -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
       -d '{"id": "{{ hub_id }}"}'
-      {{ fulfillment_address }}:{{ fulfillment_port }}
+      {{ fulfillment_address }}
       private.v1.Hubs/Get
   register: hub_describe_result
   changed_when: false
@@ -150,7 +188,7 @@
       grpcurl -insecure
       -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
       -d '{"id": "{{ hub_id }}"}'
-      {{ fulfillment_address }}:{{ fulfillment_port }}
+      {{ fulfillment_address }}
       private.v1.Hubs/Delete
   register: hub_delete_result
   changed_when: hub_delete_result.rc == 0
@@ -164,7 +202,7 @@
       grpcurl -insecure
       -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
       -d '{"id": "{{ hub_id }}"}'
-      {{ fulfillment_address }}:{{ fulfillment_port }}
+      {{ fulfillment_address }}
       private.v1.Hubs/Get
   register: hub_deletion_verification
   failed_when: hub_deletion_verification.rc == 0
