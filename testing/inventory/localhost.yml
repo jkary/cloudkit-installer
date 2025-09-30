@@ -13,7 +13,7 @@ all:
     test_cleanup: true
     
     # Paths and executables
-    fulfillment_cli_path: "{{ playbook_dir }}/../fulfillment-cli"
+    fulfillment_cli_path: "{{ ansible_env.GOPATH | default(ansible_env.HOME + '/go') }}/bin/fulfillment-cli"
     testing_workspace: "/tmp/cloudkit-e2e-testing"
     
     # Default test configuration
