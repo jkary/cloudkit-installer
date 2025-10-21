@@ -1,0 +1,21 @@
+---
+# Default variables for fulfillment_cli_base role
+
+# CLI binary and configuration
+cli_binary: "{{ fulfillment_cli_path }}"
+cli_config_dir: "{{ ansible_env.HOME }}/.config/fulfillment-cli"
+cli_config_file: "{{ ansible_env.HOME }}/.config/fulfillment-cli/config.json"
+cli_timeout: 300
+
+# Default CLI configuration for fulfillment-cli login
+fulfillment_address: "fulfillment-api-default.example.com:443"
+fulfillment_insecure: true
+fulfillment_token_script: "oc create token fulfillment-admin -n default --duration 1h --as system:admin"
+
+# Test settings
+log_level: debug
+enable_cleanup: true
+
+# Retry settings
+max_retries: 3
+retry_delay: 10

@@ -1,0 +1,69 @@
+---
+# CloudKit E2E Test: Hub Creation
+# This playbook tests the creation and verification of a hub in the CloudKit system
+
+- name: CloudKit Hub Creation Test
+  hosts: localhost
+  gather_facts: true
+  vars:
+    test_name: "Hub Creation Test"
+    test_description: "Test creating and verifying a hub with fulfillment-cli"
+
+  tasks:
+    - name: Display test information
+      ansible.builtin.debug:
+        msg: |
+          ==========================================
+          {{ test_name }}
+          ==========================================
+          Description: {{ test_description }}
+          Hub ID: {{ test_hub_id }}
+          Namespace: {{ test_namespace }}
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          ==========================================
+      tags:
+        - info
+
+    - name: Execute hub creation test
+      block:
+        - name: Run hub creation test
+          ansible.builtin.include_role:
+            name: test_hub_creation
+          vars:
+            hub_id: "{{ test_hub_id }}"
+      rescue:
+        - name: Cleanup test files on failure
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ testing_workspace }}/hub-kubeconfig-{{ test_hub_id }}.yaml"
+            - "{{ testing_workspace }}/grpc-token.txt"
+          failed_when: false
+
+        - name: Log test failure
+          ansible.builtin.lineinfile:
+            path: "{{ testing_workspace }}/test-execution.log"
+            line: "[{{ ansible_date_time.iso8601 }}] FAILED: Hub creation test failed"
+            create: true
+
+        - name: Re-raise the error
+          ansible.builtin.fail:
+            msg: "Hub creation test failed"
+      tags:
+        - test
+        - hub_creation
+
+  post_tasks:
+    - name: Test summary
+      ansible.builtin.debug:
+        msg: |
+          ==========================================
+          Test Summary: {{ test_name }}
+          ==========================================
+          Status: SUCCESS
+          Hub ID: {{ test_hub_id }}
+          Hub registered and verified successfully
+          ==========================================
+      tags:
+        - summary

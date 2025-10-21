@@ -1,0 +1,261 @@
+---
+# Main tasks for test_hub_creation role
+
+
+- name: Get cluster API server URL
+  ansible.builtin.command:
+    cmd: oc whoami --show-server
+  environment:
+    KUBECONFIG: "{{ ansible_env.KUBECONFIG }}"
+  register: cluster_api_url_result
+  changed_when: false
+  tags:
+    - setup
+    - cluster_info
+
+
+- name: Create minimal hub kubeconfig
+  ansible.builtin.copy:
+    content: |
+      apiVersion: v1
+      clusters:
+      - cluster:
+          server: {{ cluster_api_url_result.stdout }}
+          insecure-skip-tls-verify: true
+        name: test-hub-cluster
+      contexts:
+      - context:
+          cluster: test-hub-cluster
+          user: {{ hub_service_account }}
+        name: default
+      current-context: default
+      kind: Config
+      preferences: {}
+      users:
+      - name: {{ hub_service_account }}
+        user:
+          token: {{ grpc_token_result.stdout }}
+    dest: "{{ hub_kubeconfig_file }}"
+    mode: '0600'
+  no_log: true
+  tags:
+    - setup
+    - kubeconfig
+
+- name: Register hub with fulfillment service
+  ansible.builtin.command:
+    cmd: >
+      {{ cli_binary }} create hub
+      --id {{ hub_id }}
+      --kubeconfig {{ hub_kubeconfig_file }}
+      --namespace {{ hub_namespace }}
+  register: hub_creation_result
+  tags:
+    - test
+    - hub_creation
+
+- name: Display hub creation result
+  ansible.builtin.debug:
+    var: hub_creation_result.stdout
+  tags:
+    - info
+    - hub_creation
+
+- name: List all existing hubs via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      {{ fulfillment_address }}
+      private.v1.Hubs/List
+  register: all_hubs_list_result
+  changed_when: false
+  tags:
+    - info
+    - hub_listing
+
+- name: Set hub data for table display
+  ansible.builtin.set_fact:
+    hub_data: "{{ all_hubs_list_result.stdout | from_json | json_query('items[*].{id: id, capabilities: capabilities}') }}"
+  tags:
+    - info
+    - hub_listing
+
+- name: Display all existing hubs in table format
+  ansible.builtin.debug:
+    msg: |
+      ==========================================
+      All Registered Hubs ({{ (all_hubs_list_result.stdout | from_json).total }} total)
+      ==========================================
+      {% set id_width = ([hub_data | map(attribute='id') | map('length') | max, 10] | max) %}
+      {% set cap_width = ([hub_data | map(attribute='capabilities') | map('join', ', ') | map('length') | max, 12] | max) %}
+      {{ "%-*s | %s" | format(id_width, "Hub ID", "Capabilities") }}
+      {{ "-" * id_width }}-+-{{ "-" * cap_width }}
+      {% for hub in hub_data %}
+      {{ "%-*s | %s" | format(id_width, hub.id, hub.capabilities | join(', ')) }}
+      {% endfor %}
+      ==========================================
+  tags:
+    - info
+    - hub_listing
+
+- name: Find hubs with test prefix for cleanup
+  ansible.builtin.set_fact:
+    cleanup_hubs: "{{ hub_data | selectattr('id', 'match', '^e2e-test-hub-.*') | list }}"
+  tags:
+    - never
+    - mrclean
+
+- name: Display hubs to be cleaned up
+  ansible.builtin.debug:
+    msg: |
+      ==========================================
+      Cleaning up {{ cleanup_hubs | length }} test hubs with prefix 'e2e-test-hub-'
+      ==========================================
+      Hub IDs to delete:
+      {% for hub in cleanup_hubs %}
+      - {{ hub.id }}
+      {% endfor %}
+      ==========================================
+  when: cleanup_hubs | length > 0
+  tags:
+    - never
+    - mrclean
+
+- name: Delete test hubs via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ item.id }}"}'
+      {{ fulfillment_address }}
+      private.v1.Hubs/Delete
+  register: cleanup_delete_result
+  changed_when: cleanup_delete_result.rc == 0
+  failed_when: false
+  loop: "{{ cleanup_hubs }}"
+  when: cleanup_hubs | length > 0
+  tags:
+    - mrclean
+    - never
+
+- name: Log cleanup completion
+  ansible.builtin.debug:
+    msg: "Successfully cleaned up {{ cleanup_hubs | length }} test hubs with prefix 'e2e-test-hub-'"
+  when: cleanup_hubs | length > 0
+  tags:
+    - never
+    - mrclean
+
+- name: Verify hub registration via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      {{ fulfillment_address }}
+      private.v1.Hubs/List
+  register: hub_list_result
+  changed_when: false
+  tags:
+    - validation
+    - hub_verification
+
+- name: Check if hub appears in gRPC response
+  ansible.builtin.assert:
+    that:
+      - hub_id in hub_list_result.stdout
+    fail_msg: "Hub {{ hub_id }} not found in gRPC hub list response"
+    success_msg: "Hub {{ hub_id }} successfully registered and verified via gRPC"
+  tags:
+    - validation
+    - hub_verification
+
+- name: Get detailed hub information via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ hub_id }}"}'
+      {{ fulfillment_address }}
+      private.v1.Hubs/Get
+  register: hub_describe_result
+  changed_when: false
+  tags:
+    - info
+    - hub_verification
+
+- name: Display hub information summary
+  ansible.builtin.debug:
+    msg: |
+      ==========================================
+      Hub Information: {{ hub_id }}
+      ==========================================
+      Hub ID: {{ (hub_describe_result.stdout | from_json).object.id | default(hub_id) }}
+      Capabilities: {{ (hub_describe_result.stdout | from_json).object.capabilities | default('N/A') }}
+      Creation Timestamp: {{ (hub_describe_result.stdout | from_json).object.metadata.creationTimestamp | default('N/A') }}
+      Namespace: {{ (hub_describe_result.stdout | from_json).object.namespace | default('N/A') }}
+      ==========================================
+  tags:
+    - info
+    - hub_verification
+
+- name: Delete hub via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ hub_id }}"}'
+      {{ fulfillment_address }}
+      private.v1.Hubs/Delete
+  register: hub_delete_result
+  changed_when: hub_delete_result.rc == 0
+  tags:
+    - cleanup
+    - hub_deletion
+
+- name: Verify hub deletion via gRPC call
+  ansible.builtin.command:
+    cmd: >
+      grpcurl -insecure
+      -H "Authorization: Bearer {{ grpc_token_result.stdout }}"
+      -d '{"id": "{{ hub_id }}"}'
+      {{ fulfillment_address }}
+      private.v1.Hubs/Get
+  register: hub_deletion_verification
+  failed_when: hub_deletion_verification.rc == 0
+  tags:
+    - cleanup
+    - verification
+
+- name: Clean up test files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ hub_kubeconfig_file }}"
+    - "{{ testing_workspace }}/grpc-token.txt"
+  tags:
+    - cleanup
+    - files
+
+- name: Verify test files are cleaned up
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: cleanup_verification
+  loop:
+    - "{{ hub_kubeconfig_file }}"
+    - "{{ testing_workspace }}/grpc-token.txt"
+  failed_when: cleanup_verification.stat.exists
+  tags:
+    - cleanup
+    - verification
+
+- name: Log successful hub creation, verification, and cleanup
+  ansible.builtin.lineinfile:
+    path: "{{ testing_workspace }}/test-execution.log"
+    line: |
+      [{{ ansible_date_time.iso8601 }}] SUCCESS: Hub {{ hub_id }} created, verified, deleted, and cleaned up
+      Hub was successfully removed from fulfillment service
+  tags:
+    - logging
+    - success
