@@ -24,10 +24,15 @@ spec:
             - --leader-elect
             - --health-probe-bind-address=:8081
             - --grpc-insecure
+            - --zap-log-level=debug
           command:
             - /manager
           env:
             - name: CLOUDKIT_CLUSTER_ORDER_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CLOUDKIT_VM_ORDER_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
@@ -40,7 +45,11 @@ spec:
             - name: CLOUDKIT_FULFILLMENT_TOKEN_FILE
               value: /var/run/secrets/kubernetes.io/serviceaccount/token
             - name: CLOUDKIT_MINIMUM_REQUEST_INTERVAL
-              value: "10m"
+              value: "2m"
+            - name: CLOUDKIT_VM_CREATE_WEBHOOK
+              value: http://innabox-aap-eda-api/create-vm
+            - name: CLOUDKIT_VM_DELETE_WEBHOOK
+              value: http://innabox-aap-eda-api/delete-vm
           image: cloudkit-operator
           imagePullPolicy: Always
           livenessProbe:
