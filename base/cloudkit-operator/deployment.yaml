@@ -24,7 +24,6 @@ spec:
             - --leader-elect
             - --health-probe-bind-address=:8081
             - --grpc-insecure
-            - --zap-log-level=debug
           command:
             - /manager
           env:
@@ -47,9 +46,9 @@ spec:
             - name: CLOUDKIT_MINIMUM_REQUEST_INTERVAL
               value: "2m"
             - name: CLOUDKIT_VM_CREATE_WEBHOOK
-              value: http://innabox-aap-eda-api/create-vm
+              value: http://innabox-foobar-eda-service:5000/create-vm
             - name: CLOUDKIT_VM_DELETE_WEBHOOK
-              value: http://innabox-aap-eda-api/delete-vm
+              value: http://innabox-foobar-eda-service:5000/delete-vm
           image: cloudkit-operator
           imagePullPolicy: Always
           livenessProbe:
